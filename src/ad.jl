@@ -90,12 +90,14 @@ function ift_gradient(loss_fn, u_star::AbstractVector, params::ReactorParams,
     λ = J' \ dLdu
 
     # 4-5. dF/dtheta via FD, then contract with lambda──────────
-    grad  = similar(θ0)
-    f0    = similar(u_star)
+
+    f0 = similar(u_star)
     _residual!(f0, u_star, params)
-    fp    = similar(u_star)
+
+    grad = similar(θ0)
     for k in 1:nθ
         θp = copy(θ0); θp[k] += h
+        fp = similar(u_star)
         _residual!(fp, u_star, θ_setter(params, θp))
         grad[k] = -dot(λ, (fp .- f0) ./ h)
     end
