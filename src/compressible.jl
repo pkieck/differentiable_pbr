@@ -110,8 +110,16 @@ layout is identical to the incompressible solver:
   [u_r | u_z | p' | T_f | T_s | Y_1 .. Y_Ns]
 """
 function rhs_compressible!(du, u, p::CompressibleParams, t)
+    # Function barrier: lift the species count to a compile-time `Val` so every
+    # per-cell `ntuple(..., Val(Ns))` below is statically sized. This is the one
+    # dynamic dispatch per RHS call; everything inside the kernel is type-stable
+    # and allocation-free.
+    _rhs_compressible_kernel!(du, u, p, t, Val(length(p.D_species)))
+end
+
+function _rhs_compressible_kernel!(du, u, p::CompressibleParams, t, ::Val{Ns}) where {Ns}
     g    = p.grid
-    s    = StateLayout(g.nr, g.nz, length(p.D_species))
+    s    = StateLayout(g.nr, g.nz, Ns)
     pm   = p.porous
     gas  = p.gas
     sl   = p.solid
@@ -133,9 +141,8 @@ function rhs_compressible!(du, u, p::CompressibleParams, t)
     dTf = field_mat(du, s, F_TF)
     dTs = field_mat(du, s, F_TS)
 
-    Ns = s.Ns
-    Y_views  = ntuple(k -> field_mat(u,  s, 5+k), Ns)
-    dY_views = ntuple(k -> field_mat(du, s, 5+k), Ns)
+    Y_views  = ntuple(k -> field_mat(u,  s, 5+k), Val(Ns))
+    dY_views = ntuple(k -> field_mat(du, s, 5+k), Val(Ns))
 
     fill!(du, zero(eltype(du)))
 
@@ -308,7 +315,7 @@ function rhs_compressible!(du, u, p::CompressibleParams, t)
         # the rxn_rate / rxn_negdH / rxn_mass_coeff accessors (kinetics.jl) is the
         # whole coupling surface to the kinetics backend — legacy `Reaction` and
         # parsed `GlobalReaction` (CHEMKIN) both implement it.
-        Yvals = ntuple(l -> Y_views[l][i,j], Ns)
+        Yvals = ntuple(l -> Y_views[l][i,j], Val(Ns))
 
         Q_rxn = zero(Tdt)
         for rxn in p.reactions
