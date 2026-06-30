@@ -171,7 +171,6 @@ function _rhs_compressible_kernel!(du, u, p::CompressibleParams, t, ::Val{Ns}) w
     # Inlet ghost density from the Dirichlet inlet state (T_f,in, Y_in)
     Tf_bc = p.bcs.Tf_in
     Ts_bc = p.bcs.Ts_in
-    uz_bc = p.bcs.uz_in
     invM_in = zero(Tdt)
     for k in 1:min(Ns, length(p.bcs.Y_in))
         invM_in += p.bcs.Y_in[k] / Msp[k]
@@ -210,7 +209,7 @@ function _rhs_compressible_kernel!(du, u, p::CompressibleParams, t, ::Val{Ns}) w
         rho_im1 = (i == 1)  ? rho_c  : rho_mat[i-1,j]
         rho_ip1 = (i == nr) ? rho_c  : rho_mat[i+1,j]
 
-        uz_jm1 = (j == 1)  ? 2*uz_bc - uz_c   : uz[i,j-1]
+        uz_jm1 = (j == 1)  ? 2*bc_at(p.bcs.uz_in, i) - uz_c   : uz[i,j-1]
         uz_jp1 = (j == nz) ? uz_c             : uz[i,j+1]
         ur_jm1 = (j == 1)  ? -ur_c            : ur[i,j-1]
         ur_jp1 = (j == nz) ? ur_c             : ur[i,j+1]

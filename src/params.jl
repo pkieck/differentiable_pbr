@@ -25,16 +25,26 @@ Conventions:
 - Axis (r=0): Symmetry ur=0, Neumann on others.
 - Wall (r=R): No-slip ur=uz=0; Neumann on T, Y.
 """
-struct BoundaryConditions{T<:AbstractFloat}
-    uz_in::T           # inlet axial velocity  [m/s]
+struct BoundaryConditions{T<:Real, U}
+    uz_in::U           # inlet axial velocity [m/s]: scalar OR length-nr radial profile
     Tf_in::T           # inlet fluid temperature [K]
     Ts_in::T           # inlet solid temperature [K]
     Y_in::Vector{T}    # inlet mass fractions (length Ns)
 end
 
-BoundaryConditions(uz_in::T, Tf_in::T=T(300), Ts_in::T=T(300),
-                   Y_in::Vector{T}=T[]) where T =
-    BoundaryConditions{T}(uz_in, Tf_in, Ts_in, Y_in)
+function BoundaryConditions(uz_in::U, Tf_in::Real=300.0, Ts_in::Real=300.0,
+                            Y_in::AbstractVector=Float64[]) where {U}
+    T = promote_type(eltype(float.(uz_in)), typeof(float(Tf_in)),
+                     typeof(float(Ts_in)), eltype([float.(Y_in); 0.0]))
+    BoundaryConditions{T, U}(uz_in, T(Tf_in), T(Ts_in), convert(Vector{T}, Y_in))
+end
+
+# When uz_in is a length-nr radial profile use the value at row i; when it is a
+# scalar return it unchanged.  Lets a velocity *profile* be imposed at the inlet
+# without changing the scalar fast path (bc_at(::Number) is identity → existing
+# verified cases stay bit-for-bit identical).
+@inline bc_at(x::Number, i::Integer)        = x
+@inline bc_at(x::AbstractVector, i::Integer) = @inbounds x[i]
 
 """
 A single Arrhenius reaction:
@@ -78,7 +88,10 @@ function ReactorParams(grid, porous, fluid::FluidProps{T}, solid, reactions,
                        beta_ac, gravity, D_species;
                        uz_in=zero(T), Tf_in=T(300), Ts_in=T(300),
                        Y_in=T[]) where T
-    bcs = BoundaryConditions(T(uz_in), T(Tf_in), T(Ts_in), convert(Vector{T}, Y_in))
+    # uz_in may be a scalar OR a length-nr radial profile vector; coerce element
+    # type but keep its container shape.
+    uz_bc = uz_in isa AbstractVector ? convert(Vector, float.(uz_in)) : float(uz_in)
+    bcs = BoundaryConditions(uz_bc, Tf_in, Ts_in, convert(Vector, float.(Y_in)))
     ReactorParams(grid, porous, fluid, solid, reactions,
                   T(beta_ac), T(gravity), D_species, bcs)
 end

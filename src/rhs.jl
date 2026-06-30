@@ -133,7 +133,7 @@ function rhs!(du, u, p::ReactorParams, t)
         # For momentum (uz, ur) the same ghost is used for both; for scalars
         # (T, Y) we split. This is the correct FVM treatment of Dirichlet inlet
         # BCs with first-order upwind advection.
-        uz_bc  = p.bcs.uz_in
+        uz_bc  = bc_at(p.bcs.uz_in, i)   # scalar, or row-i value of a radial inlet profile
         Tf_bc  = p.bcs.Tf_in
         Ts_bc  = p.bcs.Ts_in
 
